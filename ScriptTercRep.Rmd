@@ -1,0 +1,602 @@
+---
+title: "Contextualizando as eleições"
+author: "Nathan Giachetta"
+date: "28 de agosto de 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Este documento tem como objetivo contextualizar as eleições da Terceira República em busca de perguntas que possam fomentar as discussões da matéria.
+
+```{r message = FALSE, echo=FALSE, warning=F}
+# Pacotes
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(stringr)
+library(readr)
+library(ggthemes)
+library(RColorBrewer)
+library(rvest)
+library(reshape2)
+library(ggmap)
+library(leaflet)
+#library(maps)
+library(readxl)
+library(plotly)
+```
+
+```{r message=F, echo=FALSE}
+# Abrindo as bases
+
+## Eleicoes gerais: 1945, 1947, 1950, 1954, 1958 e 1962
+labels.partido <- c("DATA_GERACAO", "HORA_GERACAO", "ANO_ELEICAO", "NUM_TURNO", "DESCRICAO_ELEICAO", "SIGLA_UF", "SIGLA_UE",
+                    "CODIGO_CARGO", "DESCRICAO_CARGO", "TIPO_LEGENDA", "NOME_COLIGACAO", "COMPOSICAO_LEGENDA", "SIGLA_PARTIDO", "NUMERO_PARTIDO",
+                    "NOME_PARTIDO", "QTDE_VOTOS_NOMINAIS", "QTDE_VOTOS_LEGENDA")
+labels.detalhe <- c("DATA_GERACAO", "HORA_GERACAO", "ANO_ELEICAO", "NUM_TURNO",
+                    "DESCRICAO_ELEICAO", "SIGLA_UF", "SIGLA_UE", "CODIGO_CARGO",
+                    "DESCRICAO_CARGO","QTD_APTOS","QTD_COMPARECIMENTO",
+                    "QTD_ABSTENCOES","QTD_VOTOS_NOMINAIS","QTD_VOTOS_BRANCOS",
+                    "QTD_VOTOS_NULOS","QTD_VOTOS_LEGENDA","QTD_VOTOS_ANULADOS_APU_SEP",
+                    "QTD_SECOES_TOT","QTD_SECOES_ANULADAS","QTD_SECOES_SEM_FUNCION",
+                    "QTD_ZONAS_ELEITORAIS","QTD_JUNTAS_APURADORAS")
+labels.candidato <- c("DATA_GERACAO", "HORA_GERACAO", "ANO_ELEICAO", "NUM_TURNO", "DESCRICAO_ELEICAO", "SIGLA_UF", "SIGLA_UE",
+                      "CODIGO_CARGO","NUMERO CAND", "SQ_CANDIDATO", "NOME_CANDIDATO",
+                      "NOME_URNA_CANDIDATO","DESCRICAO_CARGO","COD_SIT_CAND_SUPERIOR",
+                      "DESC_SIT_CAND_SUPERIOR", "CODIGO_SIT_CANDIDATO", 
+                      "DESC_SIT_CANDIDATO", "CODIGO_SIT_CAND_TOT", "DESC_SIT_CAND_TOT",
+                      "NUMERO_PARTIDO","SIGLA_PARTIDO", "NOME_PARTIDO",
+                      "SEQUENCIAL_LEGENDA", "NOME_COLIGACAO", "COMPOSICAO_LEGENDA",
+                      "TOTAL_VOTOS")
+arquivo.partido <- "VOTACAO_PARTIDO_UF_ANO_UNIDF.txt"
+arquivo.detalhe <- "DETALHE_VOTACAO_UF_ANO_UNIDF.txt"
+arquivo.cand <- "VOTACAO_CANDIDATO_UF_ANO_UNIDF.txt"
+
+### 1945
+setwd('/home/nathang/Dropbox/TercRep/1945')
+uf.partido <- c("AC", "AL", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN",
+                "RS", "SC", "SE", "SP")
+uf.detalhe <- uf.partido
+uf.cand <- c(uf.partido, "Fernando de Noronha", "Iguaçu", "Ponta Porã")
+
+arq.ufs.partido <- purrr::map(arquivo.partido, str_replace, "UNIDF", uf.partido)
+arq.ufs.partido <- map(arq.ufs.partido, str_replace, "ANO", as.character(1945))
+
+arq.ufs.detalhe <- purrr::map(arquivo.detalhe, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.detalhe <- map(arq.ufs.detalhe, str_replace, "ANO", as.character(1945))
+
+arq.ufs.cand <- purrr::map(arquivo.cand, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.cand <- map(arq.ufs.cand, str_replace, "ANO", as.character(1945))
+
+votPart45 <- purrr::map_df(unlist(arq.ufs.partido), read_csv2, col_names = labels.partido, locale=locale(encoding = "latin1"))
+votDeta45 <- purrr::map_df(unlist(arq.ufs.detalhe), read_csv2, col_names = labels.detalhe, locale=locale(encoding = "latin1"))
+votCand45 <- purrr::map_df(unlist(arq.ufs.cand), read_csv2, col_names = labels.candidato, locale=locale(encoding = "latin1"))
+
+### 1947
+setwd('/home/nathang/Dropbox/TercRep/1947')
+uf.partido <- c("AL", "AM","AP" ,"BA", "CE", "DF", "ES", "GO","GP", "MA", "MG", "MT", "PA", "PB", "PE", "PI", "PR","RB", "RJ", "RN",
+                "RS", "SC", "SE", "SP")
+uf.detalhe <- uf.partido
+uf.cand <- uf.partido
+
+arq.ufs.partido <- purrr::map(arquivo.partido, str_replace, "UNIDF", uf.partido)
+arq.ufs.partido <- map(arq.ufs.partido, str_replace, "ANO", as.character(1947))
+
+arq.ufs.detalhe <- purrr::map(arquivo.detalhe, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.detalhe <- map(arq.ufs.detalhe, str_replace, "ANO", as.character(1947))
+
+arq.ufs.cand <- purrr::map(arquivo.cand, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.cand <- map(arq.ufs.cand, str_replace, "ANO", as.character(1947))
+
+votPart47 <- purrr::map_df(unlist(arq.ufs.partido), read_csv2, col_names = labels.partido, locale=locale(encoding = "latin1"))
+votDeta47 <- purrr::map_df(unlist(arq.ufs.detalhe), read_csv2, col_names = labels.detalhe, locale=locale(encoding = "latin1"))
+votCand47 <- purrr::map_df(unlist(arq.ufs.cand), read_csv2, col_names = labels.candidato, locale=locale(encoding = "latin1"))
+
+### 195O
+setwd('/home/nathang/Dropbox/TercRep/1950')
+uf.partido <- c("AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO","GP", "MA", "MG", "MT", "PA", "PB", "PE", "PI", "PR","PB" ,"RJ", "RN",
+                "RS", "SC", "SE", "SP")
+uf.detalhe <- uf.partido
+uf.cand <- uf.partido
+
+arq.ufs.partido <- purrr::map(arquivo.partido, str_replace, "UNIDF", uf.partido)
+arq.ufs.partido <- map(arq.ufs.partido, str_replace, "ANO", as.character(1950))
+
+arq.ufs.detalhe <- purrr::map(arquivo.detalhe, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.detalhe <- map(arq.ufs.detalhe, str_replace, "ANO", as.character(1950))
+
+arq.ufs.cand <- purrr::map(arquivo.cand, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.cand <- map(arq.ufs.cand, str_replace, "ANO", as.character(1950))
+
+votPart50 <- purrr::map_df(unlist(arq.ufs.partido), read_csv2, col_names = labels.partido, locale=locale(encoding = "latin1"))
+votDeta50 <- purrr::map_df(unlist(arq.ufs.detalhe), read_csv2, col_names = labels.detalhe, locale=locale(encoding = "latin1"))
+votCand50 <- purrr::map_df(unlist(arq.ufs.cand), read_csv2, col_names = labels.candidato, locale=locale(encoding = "latin1"))
+
+### 1954
+setwd('/home/nathang/Dropbox/TercRep/1954')
+uf.partido <- c("AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO","GP", "MA", "MG", "MT", "PA", "PB", "PE", "PI", "PR","PB" ,"RJ", "RN",
+                "RS", "SC", "SE", "SP")
+uf.detalhe <- uf.partido
+uf.cand <- uf.partido
+
+arq.ufs.partido <- purrr::map(arquivo.partido, str_replace, "UNIDF", uf.partido)
+arq.ufs.partido <- map(arq.ufs.partido, str_replace, "ANO", as.character(1954))
+
+arq.ufs.detalhe <- purrr::map(arquivo.detalhe, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.detalhe <- map(arq.ufs.detalhe, str_replace, "ANO", as.character(1954))
+
+arq.ufs.cand <- purrr::map(arquivo.cand, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.cand <- map(arq.ufs.cand, str_replace, "ANO", as.character(1954))
+
+votPart54 <- purrr::map_df(unlist(arq.ufs.partido), read_csv2, col_names = labels.partido, locale=locale(encoding = "latin1"))
+votDeta54 <- purrr::map_df(unlist(arq.ufs.detalhe), read_csv2, col_names = labels.detalhe, locale=locale(encoding = "latin1"))
+votCand54 <- purrr::map_df(unlist(arq.ufs.cand), read_csv2, col_names = labels.candidato, locale=locale(encoding = "latin1"))
+
+### 1958
+setwd('/home/nathang/Dropbox/TercRep/1958')
+uf.partido <- c("AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MT", "PA", "PB", "PE", "PI", "PR","PB","RB" ,"RJ", "RN","RO",
+                "RS", "SC", "SE", "SP")
+uf.detalhe <- uf.partido
+uf.cand <- uf.partido
+
+arq.ufs.partido <- purrr::map(arquivo.partido, str_replace, "UNIDF", uf.partido)
+arq.ufs.partido <- map(arq.ufs.partido, str_replace, "ANO", as.character(1958))
+
+arq.ufs.detalhe <- purrr::map(arquivo.detalhe, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.detalhe <- map(arq.ufs.detalhe, str_replace, "ANO", as.character(1958))
+
+arq.ufs.cand <- purrr::map(arquivo.cand, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.cand <- map(arq.ufs.cand, str_replace, "ANO", as.character(1958))
+
+votPart58 <- purrr::map_df(unlist(arq.ufs.partido), read_csv2, col_names = labels.partido, locale=locale(encoding = "latin1"))
+votDeta58 <- purrr::map_df(unlist(arq.ufs.detalhe), read_csv2, col_names = labels.detalhe, locale=locale(encoding = "latin1"))
+votCand58 <- purrr::map_df(unlist(arq.ufs.cand), read_csv2, col_names = labels.candidato, locale=locale(encoding = "latin1"))
+
+### 1962
+setwd('/home/nathang/Dropbox/TercRep/1962')
+uf.partido <- c("AC", "AL", "AM", "AP", "BA", "CE", "ES", "GB","GO", "MA", "MG", "MT", "PA", "PB", "PE", "PI", "PR","PB" ,"RJ", "RN","RO",
+                "RS", "SC", "SE", "SP")
+uf.detalhe <- uf.partido
+uf.cand <- uf.partido
+
+arq.ufs.partido <- purrr::map(arquivo.partido, str_replace, "UNIDF", uf.partido)
+arq.ufs.partido <- map(arq.ufs.partido, str_replace, "ANO", as.character(1962))
+
+arq.ufs.detalhe <- purrr::map(arquivo.detalhe, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.detalhe <- map(arq.ufs.detalhe, str_replace, "ANO", as.character(1962))
+
+arq.ufs.cand <- purrr::map(arquivo.cand, str_replace, "UNIDF", uf.detalhe)
+arq.ufs.cand <- map(arq.ufs.cand, str_replace, "ANO", as.character(1962))
+
+votPart62 <- purrr::map_df(unlist(arq.ufs.partido), read_csv2, col_names = labels.partido, locale=locale(encoding = "latin1"))
+votDeta62 <- purrr::map_df(unlist(arq.ufs.detalhe), read_csv2, col_names = labels.detalhe, locale=locale(encoding = "latin1"))
+votCand62 <- purrr::map_df(unlist(arq.ufs.cand), read_csv2, col_names = labels.candidato, locale=locale(encoding = "latin1"))
+
+rm(uf.partido, uf.detalhe, uf.cand, arq.ufs.partido, arq.ufs.detalhe, arq.ufs.cand, labels.partido, labels.detalhe, labels.candidato, arquivo.cand, arquivo.partido, arquivo.detalhe)
+
+### Juntando todas as bases
+
+### votPartANO
+
+votPart <- bind_rows(votPart45, votPart47)
+votPart <- bind_rows(votPart, votPart50)
+votPart <- bind_rows(votPart, votPart54)
+votPart <- bind_rows(votPart, votPart58)
+votPart <- bind_rows(votPart, votPart62)
+
+rm(votPart45, votPart47, votPart50, votPart54, votPart58, votPart62)
+
+### votCandANO
+
+votCand <- bind_rows(votCand45, votCand47)
+votCand <- bind_rows(votCand, votCand50)
+votCand <- bind_rows(votCand, votCand54)
+votCand <- bind_rows(votCand, votCand58)
+votCand <- bind_rows(votCand, votCand62)
+
+rm(votCand45, votCand47, votCand50, votCand54, votCand58, votCand62)
+
+### votDetaANO
+
+votDeta <- bind_rows(votDeta45, votDeta47)
+votDeta <- bind_rows(votDeta, votDeta50)
+votDeta <- bind_rows(votDeta, votDeta54)
+votDeta <- bind_rows(votDeta, votDeta58)
+votDeta <- bind_rows(votDeta, votDeta62)
+
+rm(votDeta45, votDeta47, votDeta50, votDeta54, votDeta58, votDeta62)
+
+## Outras Bases
+setwd("/home/nathang/Dropbox/TercRep/ExercicioLimongi")
+president <- read_excel("presidencial por municipio 1945.xlsx", sheet = 1, col_names = T)
+
+estatisticas <- list()
+for (i in 1:7){
+  estatisticas[[i]] <- read_excel("EstatisticasTercRep.xlsx", sheet = i, col_names = T)
+}
+Idade1940 <- estatisticas[[1]]
+Nacionalidade40 <- estatisticas[[2]]
+Instrucao40 <- estatisticas[[3]]
+Sexo40 <- estatisticas[[4]]
+UFGeral10940 <- estatisticas[[5]]
+IdadeUF1940 <- estatisticas[[6]]
+PopPiaui1940_50 <- estatisticas[[7]]
+
+alistavelUF <- read_excel("Tabela1AlistavelAlistados.xlsx", col_names = T)
+
+Para <- list()
+for(i in 1:2){
+  Para[[i]] <- read_excel("Tabela2DistPorGenPara.xlsx", sheet = i, col_names = T)
+}
+AlistPara1940 <- Para[[1]]
+PopPara1940_50 <- Para[[2]]
+
+AlistamentoPI <- read_excel("Tabela3DistPorGeneroPI.xlsx", col_names = T)
+
+### Organizando as bases para analises
+# president
+president$Estado_1945 <- toupper(president$Estado_1945)
+
+# alistavelUF
+url <- "https://pt.wikipedia.org/wiki/Unidades_federativas_do_Brasil" # Url
+
+sigla <- url %>% read_html() %>% html_table(fill = T) %>% .[[1]] %>% select("Unidade Federativa", "Abreviação") %>% rename("sigla" = "Abreviação") # Scraping
+sigla <- sigla %>% rename("Estado"="Unidade Federativa")
+
+sigla$Estado <- iconv(sigla$Estado, to='ASCII//TRANSLIT')
+
+alistavelUF$UnidadesFederacao <- iconv(alistavelUF$UnidadesFederacao, to='ASCII//TRANSLIT')
+
+alistavelUF <- left_join(x = alistavelUF, y = sigla, by = c("UnidadesFederacao"= "Estado"))
+
+alistavelUF$ANO <- rep(1945, nrow(alistavelUF)) 
+
+# estatisticas
+#UFGeral10940$UnidadeFederacao <- iconv(UFGeral10940, to='ASCII//TRANSLIT')
+UFGeral10940 <- left_join(x = UFGeral10940, y = sigla, by = c("UnidadeFederacao"= "Estado"))
+UFGeral10940$sigla[1] <- "GP"
+UFGeral10940$sigla[4] <- "RB"
+UFGeral10940$sigla[21] <- "SP"
+
+
+PopPara1940_50 <- reshape2::melt(PopPara1940_50)
+PopPara1940_50$ANO <- NULL
+for (i in 1:nrow(PopPara1940_50)){
+  if (PopPara1940_50$variable[i] == "Pop40"){
+    PopPara1940_50$ANO[i] <- 1946
+  }else{
+    PopPara1940_50$ANO[i] <- 1951
+  }
+}
+
+GeralPara <- left_join(AlistPara1940, PopPara1940_50, by = c("Municipios", "ANO"))
+
+GeralPara <- GeralPara %>% rename("Populacao" = "value")
+
+GeralPara <- GeralPara %>% mutate(TotalAlistado = Feminino + Masculino,
+                                  PorcentagemAlistado = TotalAlistado/Populacao,
+                                  PorcentagemMasc = Masculino/Populacao,
+                                  PorcentagemFem = Feminino/Populacao,
+                                  PorcentMasAlistados = Masculino/TotalAlistado,
+                                  PorcentFemAlistados = Feminino/TotalAlistado,
+                                  ESTADO = rep("PA", nrow(GeralPara))) 
+
+# Piaui
+PopPiaui1940_50 <- melt(PopPiaui1940_50)
+
+PopPiaui1940_50$ANO <- NULL
+for (i in 1:nrow(PopPiaui1940_50)){
+  if (PopPiaui1940_50$variable[i] == "Pop40"){
+    PopPiaui1940_50$ANO[i] <- 1946
+  }else{
+    PopPiaui1940_50$ANO[i] <- 1951
+  }
+}
+AlistamentoPI <- AlistamentoPI %>% group_by(Municipios, ANO) %>% summarise(Feminino = sum(Feminino, na.rm = T),
+                                                                           Masculino = sum(Masculino, na.rm = T))
+
+GeralPiaui <- left_join(AlistamentoPI, PopPiaui1940_50, by = c("Municipios", "ANO"))
+
+GeralPiaui <- GeralPiaui %>% rename("Populacao" = "value")
+
+GeralPiaui <- GeralPiaui %>% mutate(TotalAlistado = Feminino + Masculino,
+                                  PorcentagemAlistado = TotalAlistado/Populacao,
+                                  PorcentagemMasc = Masculino/Populacao,
+                                  PorcentagemFem = Feminino/Populacao,
+                                  PorcentMasAlistados = Masculino/TotalAlistado,
+                                  PorcentFemAlistados = Feminino/TotalAlistado,
+                                  ESTADO = rep("PI")) 
+```
+
+# Algumas análises
+
+## Quantidade de eleitores aptos para votar durante as eleições para deputados federais da Terceira República
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+options(scipen=999)
+p1 <- votDeta %>% filter(DESCRICAO_CARGO =="DEPUTADO FEDERAL")%>%  group_by(ANO_ELEICAO) %>% summarise(APTOS = sum(QTD_APTOS), COMP = sum(QTD_COMPARECIMENTO)) %>% 
+  ggplot(., aes(x = ANO_ELEICAO, y = APTOS)) + geom_line(color = 'orange', size = 1) + theme_wsj() + scale_x_continuous(breaks = c(1945, 1947, seq(1950,1962,4)))+
+  ggtitle(label = "Quantidade de eleitores aptos para votar", subtitle = "Eleições para Deputados Federais")+
+  scale_y_continuous( limits = c(3000000, 20000000))+geom_vline(xintercept = c(1947,1958), linetype = "dotted")
+p1
+```
+
+Vemos que a quantidade de eleitores aptos cresceu ao longo do período, porém os anos de 1947 e 1958 mostram quedas relacionadas aos anos anteriores. Uma pergunta possível seria encontrar quais os motivos para a diminuição de eleitores aptos.
+
+## Quantidade de comparecimentos nas eleições para deputados federais da Terceira República
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+options(scipen=999)
+p2 <- votDeta %>% filter(DESCRICAO_CARGO =="DEPUTADO FEDERAL")%>%  group_by(ANO_ELEICAO) %>% summarise(APTOS = sum(QTD_APTOS), COMP = sum(QTD_COMPARECIMENTO)) %>% 
+  ggplot(., aes(x = ANO_ELEICAO, y = COMP)) + geom_line(color = 'orange', size = 1) + theme_wsj() + scale_x_continuous(breaks = c(1945, 1947, seq(1950,1962,4)))+
+  ggtitle(label = "Quantidade de comparecimento", subtitle = "Eleições para Deputados Federais")+
+  scale_y_continuous( limits = c(1000000, 16000000))+geom_vline(xintercept = 1947, linetype = "dotted")
+p2
+```
+
+Assim como no gráfico anterior, temos uma tendência de crescimento, porém em 1947 temos uma queda em relação a 1945, como explicar este movimento?
+
+## Quantidade de votos recebidos para Deputado Federal (PSD, UDN, PTB)
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+p3 <-votPart %>% filter(DESCRICAO_CARGO == "DEPUTADO FEDERAL", SIGLA_PARTIDO %in% c("PSD", "UDN", "PTB")) %>% group_by(ANO_ELEICAO, SIGLA_PARTIDO) %>% summarise(TOTAL_RECEBIDOS = sum(QTDE_VOTOS_NOMINAIS, na.rm = T) + sum(QTDE_VOTOS_LEGENDA, na.rm = T)) %>% 
+  ggplot(., aes(x = ANO_ELEICAO, y = TOTAL_RECEBIDOS))+ geom_line(aes(color = SIGLA_PARTIDO), size = 1) +theme_wsj() +scale_x_continuous(breaks = c(1945, 1947, seq(1950,1962,4)))+
+  ggtitle(label = "Quantidade de votos recebidos por partido", subtitle = "Eleições para Deputados Federais")+scale_color_brewer(palette = "Dark2")+
+  theme(legend.position = "bottom")
+p3
+```
+
+No que diz respeito aos votos recebidos pelos principais partidos do período, destaca-se o crescimento do PTB a partir de 1947, inclusive ultrapassando a UDN e mantendo um crescimento aparentemente constante.
+
+## Qual foi o desempenho do PCB em relação aos demais partidos (porcentagem total por UF)
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+p4 <- votCand %>%
+  filter(DESCRICAO_CARGO == "PRESIDENTE",
+         ANO_ELEICAO == 1945,
+         SIGLA_PARTIDO %in% c("PCB", "PSD", "UDN")) %>%
+  group_by(SIGLA_UF, SIGLA_PARTIDO) %>% 
+  summarise(TOTAL_VOTOS = sum(TOTAL_VOTOS)) %>% 
+  ungroup() %>% 
+  group_by(SIGLA_UF) %>% 
+  mutate(TOTAL_REC = sum(TOTAL_VOTOS),
+         PORC = TOTAL_VOTOS/TOTAL_REC,
+         REGIAO = recode(SIGLA_UF,"AM" ="Norte",
+                         "AC" = "Norte",
+                         "PA" = "Norte",
+                         "MA" = "Nordeste",
+                         "PI" = "Nordeste",
+                         "CE" = "Nordeste",
+                         "RN" = "Nordeste",
+                         "PB" = "Nordeste",
+                         "PE" = "Nordeste",
+                         "AL" = "Nordeste",
+                         "SE" = "Leste",
+                         "BA" = "Leste",
+                         "MG" = "Leste",
+                         "ES" = "Leste",
+                         "RJ" = "Leste",
+                         "DF" = "Leste",
+                         "SP" = "Sul",
+                         "PR" = "Sul",
+                         "SC" = "Sul",
+                         "RS" = "Sul",
+                         "MT" = "Centro-Oeste",
+                         "GO" = "Centro-Oeste")) %>% 
+  ggplot(aes(x = SIGLA_UF, y = PORC)) + geom_bar(stat = "identity", aes(fill = SIGLA_PARTIDO), position = "dodge",width = 0.85)+
+  theme_wsj()+scale_fill_brewer(palette="Dark2")+ggtitle(label = "Porcentagem de votos recebidos\nna eleição presidencial", subtitle = "Eleição de 1945")+
+  theme(legend.position = "bottom")+scale_y_continuous(breaks = seq(.1, 1, .1), limits = c(0, 1))
+p4
+
+```
+
+Podemos perceber que PCB teve grande destaque no DF, PE e SP, por exemplo. Seria interessante saber qual o principal eleitorado do PCB.
+
+## Como os votos se distribuem entre os candidados à presidencia (1945)
+
+```{r fig.width=12, fig.height=8, echo=FALSE, warning=F}
+president <- president %>% 
+  group_by(Estado_1945) %>% 
+  summarise(Dutra = sum(as.numeric(Dutra), na.rm = T),
+            Gomes = sum(as.numeric(Gomes), na.rm = T),
+            Teles = sum(as.numeric(Teles), na.rm = T),
+            Fiuza = sum(as.numeric(Fiuza), na.rm = T),
+            Total_1945 = sum(Total_1945, na.rm =T),
+            PorcDutra = Dutra /Total_1945,
+            PorcGomes = Gomes/Total_1945,
+            PorcTeles = Teles/Total_1945,
+            PorcFiuza = Fiuza/Total_1945)
+
+presidentHeatMap <- president %>% select(PorcDutra, PorcFiuza, PorcGomes, PorcTeles, Estado_1945) %>% melt()
+
+#Comparação geral
+p5 <- ggplot(presidentHeatMap, aes(variable, Estado_1945))+ geom_tile(aes(fill=value), colour = "white") + scale_fill_gradient(low = "#fceba9", high = "#c02425")+theme_wsj() +theme(legend.position = "bottom", legend.title=element_blank()) + ggtitle("Porcentagem de votos ganhos por\nUnidade Federativa", subtitle = "Eleições de 1945 para Presidente")+scale_x_discrete(labels = c("PorcDutra"="Dutra", "PorcFiuza"="Fiuza", "PorcGomes"="Gomes", "PorcTeles"="Teles"))
+p5
+```
+
+Neste gráico, também conhecido como "heatmap", podemos notar a concentração de votos por UF. Podemos perceber que a porcentagem de votos atribuidos à Dutra se distribui ao longo de todas as unidades de análise. O mesmo também pode ser verificado para Gomes, porém a porcentagem de votos atribuidos a ele é menor do que o candidato do PSD. 
+
+No que diz respeito ao candidato do PCB, podemos perceber que em muitos locais ele recebeu menos de 25% do total. Por fim, Teles surpreende ao receber uma quantidade superior de votos no Território de Rio Branco.
+
+## Alguns estudos de caso
+
+Recebemos dados de alistamento do Piaui e do Pará, portanto, podemos explorar estes dados.
+
+### Piaui
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+#MasFem <- GeralPiaui %>% group_by(ANO) %>% summarise(TotMas = sum(Masculino, na.rm = T),
+   #                                       TotFem = sum(Feminino, na.rm = T))
+#GeralPiaui <- left_join(GeralPiaui, MasFem, by = "ANO")
+#p6 <- GeralPiaui %>% mutate(PorcMas = Masculino /(TotMas + TotFem),
+  #                          PorcFem = Feminino /(TotFem + TotMas)) %>% 
+  #select(Municipios, ANO, PorcMas, PorcFem) %>% 
+  #melt(id.vars = 1:2) %>% 
+  #ggplot(.,aes(x = Municipios, y = value)) +
+  #geom_bar(aes(fill = variable),stat="identity")+facet_grid(ANO~.)+theme_wsj()+
+  #theme(axis.text.x = element_text(angle=45, hjust = 1))+
+  #scale_fill_brewer(labels=c("Alistamento Masculino", "Alistamento Feminino"),palette="Dark2")+
+  #ggtitle("Porcentagem de Alistamento por Ano", subtitle = "Piauí")+
+  #theme(legend.title =element_blank(), legend.position = "bottom",  legend.box = "horizontal")
+#p6
+p6 <- GeralPiaui %>% select(Municipios, ANO, PorcentMasAlistados, PorcentFemAlistados) %>% 
+  melt(id.vars = 1:2) %>% 
+  ggplot(.,aes(x = Municipios, y = value)) +
+  geom_bar(aes(fill = variable),stat="identity")+facet_grid(ANO~.)+theme_wsj()+
+  theme(axis.text.x = element_text(angle=45, hjust = 1))+
+  scale_fill_brewer(labels=c("Alistamento Masculino", "Alistamento Feminino"),palette="Dark2")+
+  ggtitle("Porcentagem de Alistamento por Ano", subtitle = "Piauí")+
+  theme(legend.title =element_blank(), legend.position = "bottom",  legend.box = "horizontal")
+p6
+```
+
+Com este dado é possível percebermos que o alistamento cresceu de um pleito para o outro, podemos inclusive ver qual foi o crescimento percentual entre os anos
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+GeralPiaui <- GeralPiaui %>% arrange(Municipios, ANO)
+MunicipioPI <- c()
+DifMPI <- c()
+DifFPI <-  c()
+for (i in 1:(nrow(GeralPiaui)-1)){
+  if (GeralPiaui$Municipios[i] == GeralPiaui$Municipios[i+1]){
+    DifMPI[i] <- ((GeralPiaui$Masculino[i+1] * 100)/ GeralPiaui$Masculino[i])-100
+    DifFPI[i] <- ((GeralPiaui$Feminino[i+1] *100) / GeralPiaui$Feminino[i])-100
+    MunicipioPI[i] <- GeralPiaui$Municipios[i]
+  }
+}
+DifPI <- data.frame(MunicipioPI, DifMPI, DifFPI)
+DifPI <- na.omit(DifPI)
+MeltDifPI <- melt(DifPI)  
+p7 <- ggplot(MeltDifPI, aes(x = value, y = MunicipioPI))+geom_point(aes(color = variable), size = 3)+theme_wsj()+
+  ggtitle("Variação Percentual de alistamento", subtitle = "Piaui (1946 e 1951)")+
+  theme(legend.title =element_blank(), legend.position = "bottom",  legend.box = "horizontal")+
+  scale_color_brewer(labels=c("Alistamento Masculino", "Alistamento Feminino"),palette="Dark2")+geom_vline(xintercept = 0)+scale_x_continuous(breaks = c(seq(0, 400, 20)))
+p7
+```
+
+É interessante notar, que em alguns municipios houve um crescimento percentual de alistamento feminino maior que o aumento percentual de alistamento masculino.
+
+Uma pergunta interessante a partir desta análise é verificar que já que o alistamento teve um crescimento entre 1946 e 1951, como se deu o comparecimento e a quantidade de eleitores aptos nas eleições entre estes intervalos?
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+options(scipen=999)
+p8 <- votDeta %>% filter(DESCRICAO_CARGO =="DEPUTADO FEDERAL", SIGLA_UF == "PI")%>%  group_by(ANO_ELEICAO) %>% summarise(Aptos = sum(QTD_APTOS), Comparecimento = sum(QTD_COMPARECIMENTO)) %>% 
+  select(ANO_ELEICAO, Comparecimento, Aptos) %>% 
+  melt(id.vars = 1) %>% 
+  rename("Indices" = "variable") %>% 
+  ggplot(., aes(x = ANO_ELEICAO, y = value)) + geom_line(aes(color = Indices), size = 1) + theme_wsj() + scale_x_continuous(breaks = c(1945, 1947, seq(1950,1962,4)))+
+  ggtitle(label = "Quantidade de comparecimento e eleitores aptos", subtitle = "Eleições para Deputados Federais (PI)")+theme(legend.position = "bottom")+geom_vline(xintercept = c(1946,1951), linetype = "dotted")
+p8
+```
+
+### Pará
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+p9 <- GeralPara %>% select(Municipios, ANO, PorcentMasAlistados, PorcentFemAlistados) %>%
+  filter(!(Municipios %in% c("Capanema", "Gurupa"))) %>% 
+  melt(id.vars = 1:2) %>% 
+  ggplot(.,aes(x = Municipios, y = value)) +
+  geom_bar(aes(fill = variable),stat="identity")+facet_grid(ANO~.)+theme_wsj()+
+  theme(axis.text.x = element_text(angle=45, hjust = 1))+
+  scale_fill_brewer(labels=c("Alistamento Masculino", "Alistamento Feminino"),palette="Dark2")+
+  ggtitle("Porcentagem de Alistamento por Ano", subtitle = "Pará")+
+  theme(legend.title =element_blank(), legend.position = "bottom",  legend.box = "horizontal")
+p9
+```
+
+Realizando as mesmas operações...
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+GeralPara <- GeralPara %>% arrange(desc(Municipios, ANO))
+MunicipioPA <- c()
+DifMPA <- c()
+DifFPA <-  c()
+for (i in 1:(nrow(GeralPara)-1)){
+  if (GeralPara$Municipios[i] == GeralPara$Municipios[i+1]){
+    DifMPA[i] <- ((GeralPara$Masculino[i+1] * 100)/ GeralPara$Masculino[i])-100
+    DifFPA[i] <- ((GeralPara$Feminino[i+1] *100) / GeralPara$Feminino[i])-100
+    MunicipioPA[i] <- GeralPara$Municipios[i]
+  }
+}
+DifPA <- data.frame(MunicipioPA, DifMPA, DifFPA)
+DifPA <- na.omit(DifPA)
+MeltDifPA <- melt(DifPA)  
+p7 <- ggplot(MeltDifPA, aes(x = value, y = MunicipioPA))+geom_point(aes(color = variable), size = 3)+theme_wsj()+
+  ggtitle("Variação percentual de alistamento", subtitle = "Pará (1946 e 1951)")+
+  theme(legend.title =element_blank(), legend.position = "bottom",  legend.box = "horizontal")+
+  scale_color_brewer(labels=c("Alistamento Masculino", "Alistamento Feminino"),palette="Dark2")+geom_vline(xintercept = 0)+scale_x_continuous(breaks = c(seq(-60,0,20),seq(0, 160, 20)))
+p7
+```
+
+No caso do Pará vemos uma situação um pouco diferente do Piaui, inclusive de municipios cujo a variação percentual de 1946 para 1951 foi negativa.
+
+```{r fig.width=12, fig.height=8, echo=FALSE}
+options(scipen=999)
+p8 <- votDeta %>% filter(DESCRICAO_CARGO =="DEPUTADO FEDERAL", SIGLA_UF == "PA")%>%  group_by(ANO_ELEICAO) %>% summarise(Aptos = sum(QTD_APTOS), Comparecimento = sum(QTD_COMPARECIMENTO)) %>% 
+  select(ANO_ELEICAO, Comparecimento, Aptos) %>% 
+  melt(id.vars = 1) %>% 
+  rename("Indices" = "variable") %>% 
+  ggplot(., aes(x = ANO_ELEICAO, y = value)) + geom_line(aes(color = Indices), size = 1) + theme_wsj() + scale_x_continuous(breaks = c(1945, 1947, seq(1950,1962,4)))+
+  ggtitle(label = "Quantidade de comparecimento e eleitores aptos", subtitle = "Eleições para Deputados Federais (PA)")+theme(legend.position = "bottom")+geom_vline(xintercept = c(1946,1951), linetype = "dotted")
+p8
+```
+
+Por fim, utilizando os dados do Pará decidi georeferenciar os votos por municipio para verificar se quanto mais próximo do centro da cidade maior a atribuição de votos a um certo candidato. Ainda não completei esta tarefa, mas cheguei até o exemplo abaixo:
+
+```{r fig.width=10, fig.height=6, echo=FALSE, message=F, warning=F}
+library(purrr)
+president <- read_excel("presidencial por municipio 1945.xlsx", sheet = 1, col_names = T)
+
+president <- president %>% filter(Estado_1945 == "PA")
+
+codigo <- president$Código_Ibge
+
+url <- "http://www.ibge.gov.br/home/geociencias/areaterritorial/area.php?nome=&codigo=CODIGOMUN&submit.x=18&submit.y=5"
+
+codigoURL <- purrr::map(url, str_replace, "CODIGOMUN", as.character(codigo)) %>% unlist()
+CodDF <- data.frame()
+for (i in 1:23){
+  Cod <- read_html(codigoURL[i]) %>% html_table(trim = T, head = T)
+  CodDF <- bind_rows(CodDF, Cod)
+}
+
+CodDF$Município <- tolower(CodDF$Município)
+
+CodDF <- CodDF %>% select(UF,`Código Município`, Município, `Área (Km2)`)
+
+Pres <- left_join(president, CodDF, by = c("Código_Ibge"="Código Município"))
+
+#######
+library(maps)
+Pres <- Pres %>% mutate(endereco = paste(tolower(Município), ", Pará, Brazil", sep = ""))
+Pres$endereco<- iconv(Pres$endereco, to = "ASCII//TRANSLIT")
+Pres <- Pres[!is.na(Pres$endereco),]
+latlong <- data.frame()
+for (i in 1:nrow(Pres)){
+  latlong <- bind_rows(latlong, geocode(Pres$endereco[i]))
+}
+
+Pres <- bind_cols(Pres, latlong)
+Pres <- Pres %>% rename(Area = `Área (Km2)`, Mun=Município)
+
+#na <- which(is.na(Pres$lon))
+#Pres$lon[na[1]] <- -47.6265811
+#Pres$lat[na[1]] <- -1.1364742
+
+#Pres$lon[na[2]] <- -48.9693022
+#Pres$lat[na[2]] <- -1.9766988
+
+#Pres$lon[na[3]] <- -55.53004
+#Pres$lat[na[3]] <- -1.9014107
+
+PresMelt <- Pres %>% select(Dutra, Gomes, Fiuza, Teles, Mun, lat, lon) %>% melt(id.vars = c("Mun", "lat", "lon"))
+
+factpal <- colorFactor(topo.colors(4), PresMelt$variable, palette = "Dark2")
+leaflet() %>% 
+  addTiles() %>% 
+  #addMarkers(PresMelt$lon, PresMelt$lat, label = PresMelt$Mun, labelOptions = labelOptions(noHide = F, textsize = "15px")) %>% 
+  addCircles(PresMelt$lon, PresMelt$lat, radius = PresMelt$value, color = factpal(PresMelt$variable)) %>% 
+  addLegend(pal = factpal,values = PresMelt$variable)
+```
+
