@@ -1,0 +1,448 @@
+---
+title: "Relatorio"
+author: "Nathan Giachetta"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F,fig.align = "center", fig.height = 5, fig.width = 11, warning = F, message = F)
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggmap)
+library(readxl)
+library(reshape2)
+library(magrittr)
+library(stringr)
+library(rvest)
+library(purrr)
+library(httr)
+library(knitr)
+library(ggthemes)
+```
+
+
+```{r message=F, warning=FALSE, eval=FALSE}
+dados <- read_excel("dados.xlsx", sheet = "Plan1", col_names = T)
+
+dados %<>% select(-Gomes_Perc, -Fiuza_Perc, -Teles_Perc, -Dutra_Perc, -`Getúlio_Perc`, -Gomes_Perc3,
+                 -Machado_Perc, -Mangabeira_Perc,-Tavora_Perc,-Barros_Perc,-Salgado_Perc,
+                 -Kubitschek_Perc,-Quadros_Perc,-Barros_Perc5,-Lott_Perc,-Urban_Tax_1960,
+                 -Pop_Resid_1960,-Pop.Urban_1960,-PIB_Capt_1960,-Alistados_1960) %>% 
+  mutate(Zona_1945 = as.numeric(Zona_1945),
+         Fiuza = as.numeric(Fiuza),
+         Teles = as.numeric(Teles),
+         Zona_1950 = as.numeric(Zona_1950),
+         Zona_1960 = as.numeric(Zona_1960),
+         Estado_1945 = stringr::str_to_upper(Estado_1945)) %>% 
+  filter(Estado_1945 %in% c("MG", "PE", "SP"))
+
+# Preenchendo valores ausentes com 0
+# Colunas de interesse: 7, 8, 9, 10, 2 14, 15, 16, 17
+variaveis <- c(7, 8, 9, 10, 2, 14, 15, 16, 17)
+
+for (i in seq_along(variaveis)){
+  for (l in 1:nrow(dados)){
+    if(is.na(dados[l,variaveis[i]])==TRUE){
+      dados[l,variaveis[i]] <- 0
+    }
+  }
+}
+
+# Localizando Codigo IBGE
+codigos <- dados$`Código_Ibge`
+
+url <- "http://www.ibge.gov.br/home/geociencias/areaterritorial/area.php?nome=&codigo=CODIGOMUN&submit.x=18&submit.y=5"
+
+codigoURL <- map(url, str_replace, "CODIGOMUN", as.character(codigos)) %>% unlist()
+
+CodDF <- data.frame()
+for (i in 1:length(codigoURL)){
+  Cod <- read_html(codigoURL[i]) %>% html_table(trim = T, head = T)
+  CodDF <- bind_rows(CodDF, Cod)
+}
+
+CodDF <- CodDF %>% select(-`Código UF`, -UF) %>% rename(MunIBGE = `Município`, AreaKM2 = `Área (Km2)`) %>%
+  mutate(MunIBGE = tolower(MunIBGE))
+
+CodDF$AreaKM2 <- CodDF$AreaKM2 %>% map(str_replace, ",",".") %>% unlist() 
+
+options(digits = 10)
+CodDF$AreaKM2 <- as.numeric(CodDF$AreaKM2)
+
+CodDF <- unique(CodDF)
+
+dados <- left_join(dados, CodDF, by = c("Código_Ibge"="Código Município"))
+
+# Atribuindo endereço
+dados %<>% mutate(endereco = NA, enderecoICONV = NA)
+for (i in 1:nrow(dados)){
+  if (dados$UF_Atual[i] == "MG"){
+    dados$endereco[i] <- paste0(dados$MunIBGE[i],", Minas Gerais, Brazil", sep = "")
+    dados$enderecoICONV[i] <- iconv(dados$endereco[i], to = "ASCII//TRANSLIT")
+
+  } else if (dados$UF_Atual[i] == "SP"){
+      dados$endereco[i] <- paste0(dados$MunIBGE[i],", São Paulo, Brazil", sep = "")
+      dados$enderecoICONV[i] <- iconv(dados$endereco[i], to = "ASCII//TRANSLIT")
+  } else if (dados$UF_Atual[i] == "PE"){
+      dados$endereco[i] <- paste0(dados$MunIBGE[i],", Pernambuco, Brazil", sep = "")
+      dados$enderecoICONV[i] <- iconv(dados$endereco[i], to = "ASCII//TRANSLIT")
+  }
+}
+
+dados <- read.csv2("dadosAula9_V4.csv", stringsAsFactors = F)
+
+# Dados que podem contribuir
+LatitudesLongitudes <- read.csv2("https://raw.githubusercontent.com/kelvins/Municipios-Brasileiros/master/Municipios_Brasileiros.csv", stringsAsFactors = F)
+
+LatitudesLongitudes %<>% rename(Codigo_Ibge = `CÃ³digo.IBGE`,
+                                Municipio = `Nome.do.MunicÃ.pio`,
+                                lat = Latitude,
+                                lon = Longitude) %>% 
+  select(Codigo_Ibge, UF, lat, lon)
+dados %<>% select(-lon, -lat)
+dados <- left_join(dados, LatitudesLongitudes, by = c("Codigo_Ibge"))
+
+dadosMG <- dadosRev %>% filter(UF_Atual == "MG") # Capital Belo Horizonte (CodIBGE: 3106200)
+dadosPE <- dadosRev %>% filter(UF_Atual == "PE") # Capital Recife (CodIBGE: 2611606)
+dadosSP <- dadosRev %>% filter(UF_Atual == "SP") # Capital São Paulo (CodIBGE: 3550308)
+
+dadosMG %<>% mutate(Capital = ifelse(Codigo_Ibge == 3106200, yes = 1, no = 0))
+dadosPE %<>% mutate(Capital = ifelse(Codigo_Ibge == 2611606, yes = 1, no = 0))
+dadosSP %<>% mutate(Capital = ifelse(Codigo_Ibge == 3550308, yes = 1, no = 0))
+
+apiGoogleDist <- function(LatOrigem, LonOrigem, key){
+  api <- "https://maps.googleapis.com/maps/api/distancematrix/xml?units=imperial&origins=LAT,LON&destinations=LatOrigem,LonOrigem&key="
+  key <- key
+  api <- paste0(api, key, collapse = "")
+  url <- api %>%  str_replace("LatOrigem", as.character(LatOrigem)) %>% 
+    str_replace("LonOrigem",as.character(LonOrigem))
+  return(url)
+}
+
+key <- ""
+
+CapitalMG <- dadosMG %>% filter(Capital == 1) %>% select(lon, lat)
+linkMG <- apiGoogleDist(LatOrigem = CapitalMG$lat, LonOrigem = CapitalMG$lon, key = key)
+
+CapitalPE <- dadosPE %>% filter(Capital == 1) %>% select(lon, lat)
+linkPE <- apiGoogleDist(LatOrigem = CapitalPE$lat, LonOrigem = CapitalPE$lon, key = key)
+
+CapitalSP <- dadosSP %>% filter(Capital == 1) %>% select(lon, lat)
+linkSP <- apiGoogleDist(LatOrigem = CapitalSP$lat, LonOrigem = CapitalSP$lon, key = key)
+
+OrigemMG <- linkMG %>% map(str_replace, "LAT", as.character(dadosMG$lat)) %>% unlist()
+for (i in 1:length(OrigemMG)){
+  OrigemMG[i] <- str_replace(OrigemMG[i], "LON", as.character(dadosMG$lon[i]))
+}
+
+OrigemPE <- linkPE %>% map(str_replace, "LAT", as.character(dadosPE$lat)) %>% unlist() 
+for (i in 1:length(OrigemPE)){
+  OrigemPE[i] <- str_replace(OrigemPE[i], "LON", as.character(dadosPE$lon[i]))
+}
+
+OrigemSP <- linkSP %>% map(str_replace, "LAT", as.character(dadosSP$lat)) %>% unlist() 
+for (i in 1:length(OrigemSP)){
+  OrigemSP[i] <- str_replace(OrigemSP[i], "LON", as.character(dadosSP$lon[i]))
+}
+
+distValor <- c()
+distTexto <- c()
+cidade <- c()
+for (i in 1:length(OrigemSP)){
+  dist <- GET(OrigemSP[i]) %>% content(encoding = "UTF-8")
+  distValor[i] <- dist %>% html_nodes(xpath = '//distance//value') %>% html_text()
+  distTexto[i] <- dist %>% html_nodes(xpath = '//distance/text') %>% html_text()
+  cidade[i] <- dadosSP$Codigo_Ibge[i]
+}
+distSP <- data.frame(cidade, distValor, distTexto)
+
+distValor <- c()
+distTexto <- c()
+cidade <- c()
+for (i in 1:length(OrigemPE)){
+  dist <- GET(OrigemPE[i]) %>% content(encoding = "UTF-8")
+  distValor[i] <- dist %>% html_nodes(xpath = '//distance//value') %>% html_text()
+  distTexto[i] <- dist %>% html_nodes(xpath = '//distance/text') %>% html_text()
+  cidade[i] <- dadosPE$Codigo_Ibge[i]
+}
+distPE <- data.frame(cidade, distValor, distTexto)
+
+distValor <- c()
+distTexto <- c()
+cidade <- c()
+for (i in 1:length(OrigemMG)){
+  dist <- GET(OrigemMG[i]) %>% content(encoding = "UTF-8")
+  distValor[i] <- dist %>% html_nodes(xpath = '//distance//value') %>% html_text()
+  distTexto[i] <- dist %>% html_nodes(xpath = '//distance/text') %>% html_text()
+  cidade[i] <- dadosMG$Codigo_Ibge[i]
+}
+distMG <- data.frame(cidade, distValor, distTexto)
+
+# Juntando os dados
+dadosMG <- left_join(dadosMG, distMG, by = c("Codigo_Ibge" = "cidade"))
+dadosPE <- left_join(dadosPE, distPE, by = c("Codigo_Ibge" = "cidade"))
+dadosSP <- left_join(dadosSP, distSP, by = c("Codigo_Ibge" = "cidade"))
+
+dados <- bind_rows(dadosMG, dadosPE)
+dados <- bind_rows(dados, dadosSP)
+```
+
+```{r}
+dados <- read.csv2("dadosAula9_V5.csv")
+```
+
+## Análises
+
+Assim como em aulas passadas, o interesse principal dos meus exercícios passaram a ser a possível influência das capitais sobre os pleitos de outras regiões, pensando sobretudo na hipótese de que __municípios mais próximos da capital tem perfis de votação semelhantes com este último__.Para além disso, e tendo em vista o contexto da época, irei verificar quais os possíveis fatores sociodemográficos estão mais associados aos padrões encontrados.
+
+Um fator de explicação que tentarei verificar é se municípios mais distantes e menos urbanizados tem em sua maioria um padrão diferente da capital. Isso pode ocorrer devido, por exemplo, a influência sobre o eleitorado em que em lugares mais urbanizados, a influência de grupos políticos poderia ser menor do que em lugares mais "precários".
+
+Na tabela abaixo temos quais são os municípios mais próximos de suas respectivas capitais e a suas taxas de urbanização.
+
+```{r}
+# Os 10 municípios mais próximos de São Paulo
+dados %>% filter(UF_Atual == "SP", Codigo_Ibge != 3550308, is.na(Urban_Tax_1950)== F ) %>% 
+  select(Mun_Principal_1945,distValor, Urban_Tax_1950) %>% 
+  arrange(distValor) %>% head(n = 10) %>% kable(format = "html", col.names = c("Municípios(SP)", "Distância em metros", "Taxa de Urbanização (1950)"))
+```
+
+```{r}
+# Os 10 municípios mais próximos de Minas Gerais
+dados %>% filter(UF_Atual == "MG", Codigo_Ibge != 3106200,is.na(Urban_Tax_1950)== F ) %>% 
+  select(Mun_Principal_1945,distValor, Urban_Tax_1950) %>% 
+  arrange(distValor) %>% head(n = 10)%>% kable(format = "html", col.names = c("Municípios (MG)", "Distância em metros", "Taxa de Urbanização (1950)"))
+```
+
+```{r}
+# Os 10 municípios mais próximos de Pernambuco
+dados %>% filter(UF_Atual == "PE", Codigo_Ibge != 2611606,is.na(Urban_Tax_1950)== F ) %>% 
+  select(Mun_Principal_1945,distValor, Urban_Tax_1950) %>% 
+  arrange(distValor) %>% head(n = 10)%>% kable(format = "html", col.names = c("Municípios(PE)", "Distância em metros", "Taxa de Urbanização (1950)"))
+```
+
+Nestas três primeiras tabelas é possível observar que a próximodade com a capital aparenta ser um fator importante para ubanização[^1]. Se plotarmos estas tabelas teremos,
+
+```{r}
+dados %>% filter(!(Codigo_Ibge %in% c(2611606,3106200,3550308)),is.na(Urban_Tax_1950)== F) %>% 
+  select(Mun_Principal_1945,distValor, Urban_Tax_1950, UF) %>% 
+  arrange(distValor) %>%
+  ggplot(., aes(Urban_Tax_1950,distValor)) + geom_point() + facet_wrap(~UF) + geom_smooth(se = F, method = "lm", color = "red") + theme_bw() + labs(title = "Relação Distância da Capital e Taxa de Urbanização (1950)", x= "Taxa de Urbanização (1950)", y = "Distância em Metros", subtitle = "O gráfico abaixo desconsidera as capitais dos respectivos Estados")
+```
+```{r message=F, warning=FALSE, eval=FALSE, echo=F}
+cor(dados %>% 
+      filter(UF_Atual == "PE", Codigo_Ibge != 2611606, is.na(Urban_Tax_1950)== F) %>%
+      select(Urban_Tax_1950), 
+    dados %>% 
+      filter(UF_Atual == "PE", Codigo_Ibge != 2611606, is.na(Urban_Tax_1950)== F) %>%
+      select(distValor))
+
+cor(dados %>% 
+      filter(UF_Atual == "MG", Codigo_Ibge != 3106200, is.na(Urban_Tax_1950)== F) %>%
+      select(Urban_Tax_1950), 
+    dados %>% 
+      filter(UF_Atual == "MG", Codigo_Ibge != 3106200, is.na(Urban_Tax_1950)== F) %>%
+      select(distValor))
+
+cor(dados %>% 
+      filter(UF_Atual == "SP", Codigo_Ibge != 3550308, is.na(Urban_Tax_1950)== F) %>%
+      select(Urban_Tax_1950), 
+    dados %>% 
+      filter(UF_Atual == "SP", Codigo_Ibge != 3550308, is.na(Urban_Tax_1950)== F) %>%
+      select(distValor), method = "pearson")
+
+```
+
+A correlação para cada um dos Estados (desconsiderando as capitais) é de -0.35 (PE), -0.27 (MG) e -0.34 (SP), o que aponta para uma correlação fraca/moderada.
+
+Outro ponto interessante que podemos comparar é questão da distância e no número de alistados durante 1950.
+
+```{r}
+dados %>% filter(!(Codigo_Ibge %in% c(2611606,3106200,3550308)),is.na(Urban_Tax_1950)== F) %>% 
+  select(Mun_Principal_1945,distValor, Alistados_1950,Pop_Resid_1950, UF) %>% 
+  arrange(distValor) %>% mutate(Alis.Pop_1950 = Alistados_1950/Pop_Resid_1950) %>% 
+  ggplot(., aes(Alis.Pop_1950,distValor)) + geom_point() + facet_wrap(~UF)+ geom_smooth(se = F, method = "lm", color = "red")+labs(title = "Relação Distância da Capital e razão entre Alistamento e População Residente (1950)", x= "razão entre Alistamento e População Residente (1950)", y = "Distância em Metros", subtitle = "O gráfico abaixo desconsidera as capitais dos respectivos Estados") +theme_bw()
+
+```
+```{r message=F, warning=FALSE, eval=FALSE, echo =F}
+cor(dados %>% 
+      filter(UF_Atual == "PE", Codigo_Ibge != 2611606, is.na(Urban_Tax_1950)== F, is.na(Alistados_1950) == F, is.na(Pop_Resid_1950) == F) %>%
+      select(Alistados_1950,Pop_Resid_1950, UF) %>% 
+      mutate(Alis.Pop_1950 = Alistados_1950/Pop_Resid_1950) %>% 
+    select(Alis.Pop_1950), 
+    dados %>% 
+      filter(UF_Atual == "PE", Codigo_Ibge != 2611606, is.na(Urban_Tax_1950)== F, is.na(Alistados_1950) == F, is.na(Pop_Resid_1950) == F) %>%
+      select(distValor))
+
+cor(dados %>% 
+      filter(UF_Atual == "MG", Codigo_Ibge != 3106200, is.na(Urban_Tax_1950)== F, is.na(Alistados_1950) == F, is.na(Pop_Resid_1950) == F) %>%
+      select(Alistados_1950,Pop_Resid_1950, UF) %>% 
+      mutate(Alis.Pop_1950 = Alistados_1950/Pop_Resid_1950) %>% 
+    select(Alis.Pop_1950), 
+    dados %>% 
+      filter(UF_Atual == "MG", Codigo_Ibge != 3106200, is.na(Urban_Tax_1950)== F, is.na(Alistados_1950) == F, is.na(Pop_Resid_1950) == F) %>%
+      select(distValor))
+
+cor(dados %>% 
+      filter(UF_Atual == "SP", Codigo_Ibge != 3550308, is.na(Urban_Tax_1950)== F, is.na(Alistados_1950) == F, is.na(Pop_Resid_1950) == F) %>%
+      select(Alistados_1950,Pop_Resid_1950, UF) %>% 
+      mutate(Alis.Pop_1950 = Alistados_1950/Pop_Resid_1950) %>% 
+    select(Alis.Pop_1950), 
+    dados %>% 
+      filter(UF_Atual == "SP", Codigo_Ibge != 3550308, is.na(Urban_Tax_1950)== F, is.na(Alistados_1950) == F, is.na(Pop_Resid_1950) == F) %>%
+      select(distValor))
+```
+
+A correlação para cada um dos Estados (desconsiderando as capitais) é de 0.32 (PE), -0.30 (MG) e 0.00 (SP). Para os estados de Pernambuco e Minas Gerais a correlação também é fraca/moderada enquanto em São Paulo, é nula.
+
+Dado estes dados descritivos vamos pensar um pouco sobre as eleições, sobretudo, o pleito para presidente em 1950.
+
+Os principais candidatos do pleitos em 1950 foram Getúlio Vargas (PTB), Eduardo Gomes (UDN), Cristiano Machado (PSD) e João Mangabeira (PSB). E como sabemos o grande vitorioso foi Vargas, com mais de 3 milhões de votos, porém o que os dados não contam é que houveram diversas mobilizações sobre quem seria o próximo presidente do Brasil.
+
+Entre elas temos um acordo intrapartidário entre o PSD, UDN e PR que nunca chegou a vigorar, mas que tinha como objetivo articular possíveis candidatos para as eleições. No que aponta D'Araujo, o apoio crescente de Vargas, sobretudo, ao apoio gerado em São Paulo, de certa forma, no meu entender, anularam as forças que os partidos da oposição estavam tentando construir, juntamente claro, com a própria descentralização dos partidos que passaram a defender interesses comuns a eles próprios.
+
+Esta força paulista à Vargas se deu sobretudo devido a figura do Ademar de Barros, governador e político influente em São Paulo que decidiu não concorrer ao pleito de 1950, devido problemas no interior de seu governo no Estado, como corrupção e uma forte oposição. Seu apoio é tido na literatura como essêncial para conseguir votos em São Paulo.
+
+Dado isto vamos ver o que os dados podem nos ajudar para entender melhor o período.
+
+```{r}
+# Dados sem NA nas votacoes
+dadosSNA <- dados %>% filter(is.na(Total_1950)==F)
+```
+
+Devido a possíveis problemas dos dados e agregação de municípios, a filtragem dos dados resultou apenas em 381 observações, sendo 207 de Minas, 89 de Pernambuco e 85 de São Paulo. Como as capitais constam nesta filtragem, vamos verificar primeiro qual foi o padrão de votação de cada uma das capitais[^2].
+
+```{r}
+dadosSNA %<>% 
+  mutate(PorcGetulio50 =Getulio/Total_1950,
+         PorcGomes50 =Gomes2/Total_1950,
+         PorcMachado50 = Machado/Total_1950,
+         PorcMangabeira = Mangabeira/Total_1950)
+dadosSNA %>% 
+  filter(Capital == 1) %>% 
+  select(PorcGetulio50,PorcGomes50,PorcMachado50, UF_Atual) %>% 
+  melt(id = "UF_Atual") %>% 
+  rename(Candidatos = variable,
+         Porcentagem = value) %>% 
+  ggplot(data=., aes(x = Candidatos, y = Porcentagem,  fill = Candidatos)) + geom_bar(stat = "identity")+facet_wrap(~UF_Atual)+
+  scale_x_discrete(labels=c( "PorcGetulio50" = "Vargas", "PorcGomes50" = "Gomes", "PorcMachado50" = "Machado"))+
+  theme_bw()+
+  scale_fill_manual(values = c("#1d3057", "#dac364","#fe8100"))+theme(legend.position = "none")+
+  geom_text(aes(label=round(Porcentagem,3)), vjust=-0.3)+labs(title = "Distribuição de votos nas Capitais", subtitle = "Minas Gerais, Pernambuco e São Paulo")
+```
+
+Podemos perceber que nas três capitais a vitória de Vargas foi certa, sobretudo em São Paulo em que a votação atingiu cerca de 68%. Como então se "comportaram" os municípios vizinhos às capitais?
+
+Para isso irei adotar a seguinte métrica: 25% mais próximos das capitais, 50% em regiões "medianas" e 25% mais distantes das capitais.
+
+```{r}
+dadosMG <- dadosSNA %>% filter(UF_Atual == "MG", Capital != 1) %>% arrange(distValor)
+
+dadosMG$Aproximacao <- NULL
+for (i in 1:nrow(dadosMG)){
+  if(dadosMG$distValor[i] <= 228323){
+    dadosMG$Aproximacao[i] <- "25% próximo"
+  } else if(dadosMG$distValor[i] > 228323 & dadosMG$distValor[i]<= 437728){
+    dadosMG$Aproximacao[i] <- "25% mediano"
+  } else if (dadosMG$distValor[i] > 437728){
+    dadosMG$Aproximacao[i] <- "25% distante"
+  }
+}
+
+dadosSP <- dadosSNA %>% filter(UF_Atual == "SP", Capital != 1) %>% arrange(distValor)
+
+dadosSP$Aproximacao <- NULL
+for (i in 1:nrow(dadosSP)){
+  if(dadosSP$distValor[i] <= 147798){
+    dadosSP$Aproximacao[i] <- "25% próximo"
+  } else if(dadosSP$distValor[i] > 147798 & dadosSP$distValor[i]<= 434085){
+    dadosSP$Aproximacao[i] <- "25% mediano"
+  } else if (dadosSP$distValor[i] > 434085){
+    dadosSP$Aproximacao[i] <- "25% distante"
+  }
+}
+
+dadosPE <- dadosSNA %>% filter(UF_Atual == "PE", Capital != 1) %>% arrange(distValor)
+
+dadosPE$Aproximacao <- NULL
+for (i in 1:nrow(dadosPE)){
+  if(dadosPE$distValor[i] <= 89392){
+    dadosPE$Aproximacao[i] <- "25% próximo"
+  } else if(dadosPE$distValor[i] > 89392 & dadosPE$distValor[i]<= 315419){
+    dadosPE$Aproximacao[i] <- "25% mediano"
+  } else if (dadosPE$distValor[i] > 315419){
+    dadosPE$Aproximacao[i] <- "25% distante"
+  }
+}
+```
+
+
+#### Minas Gerais 
+```{r}
+
+dadosMG %<>% 
+  group_by(Aproximacao) %>% 
+  summarise(PorcGetulio50 = sum(Getulio)/sum(Total_1950),
+            PorcGomes50 = sum(Gomes2)/sum(Total_1950),
+            PorcMachado50 = sum(Machado)/sum(Total_1950))
+
+dadosMG %>% 
+  select(PorcGetulio50,PorcGomes50,PorcMachado50, Aproximacao) %>% 
+  melt(id = c("Aproximacao")) %>% 
+  rename(Candidatos = variable,
+         Porcentagem = value) %>% 
+  ggplot(data=., aes(x =  Candidatos, y = Porcentagem,  fill = Candidatos)) + geom_bar(stat = "identity")+facet_wrap(~Aproximacao)+
+  scale_x_discrete(labels=c( "PorcGetulio50" = "Vargas", "PorcGomes50" = "Gomes", "PorcMachado50" = "Machado"))+
+  theme_bw()+
+  scale_fill_manual(values = c("#1d3057", "#dac364","#fe8100"))+theme(legend.position = "none")+labs(title = "Distribuição de votos na Capital de Minas Gerais")
+```
+
+#### Pernambuco
+```{r}
+
+dadosPE %<>% 
+  group_by(Aproximacao) %>% 
+  summarise(PorcGetulio50 = sum(Getulio)/sum(Total_1950),
+            PorcGomes50 = sum(Gomes2)/sum(Total_1950),
+            PorcMachado50 = sum(Machado)/sum(Total_1950))
+
+dadosPE %>% 
+  select(PorcGetulio50,PorcGomes50,PorcMachado50, Aproximacao) %>% 
+  melt(id = c("Aproximacao")) %>% 
+  rename(Candidatos = variable,
+         Porcentagem = value) %>% 
+  ggplot(data=., aes(x =  Candidatos, y = Porcentagem,  fill = Candidatos)) + geom_bar(stat = "identity")+facet_wrap(~Aproximacao)+
+  scale_x_discrete(labels=c( "PorcGetulio50" = "Vargas", "PorcGomes50" = "Gomes", "PorcMachado50" = "Machado"))+
+  theme_bw()+
+  scale_fill_manual(values = c("#1d3057", "#dac364","#fe8100"))+theme(legend.position = "none")+labs(title = "Distribuição de votos na Capital de Pernambuco")
+```
+
+#### São Paulo
+```{r}
+
+dadosSP %<>% 
+  group_by(Aproximacao) %>% 
+  summarise(PorcGetulio50 = sum(Getulio)/sum(Total_1950),
+            PorcGomes50 = sum(Gomes2)/sum(Total_1950),
+            PorcMachado50 = sum(Machado)/sum(Total_1950))
+
+dadosSP %>% 
+  select(PorcGetulio50,PorcGomes50,PorcMachado50, Aproximacao) %>% 
+  melt(id = c("Aproximacao")) %>% 
+  rename(Candidatos = variable,
+         Porcentagem = value) %>% 
+  ggplot(data=., aes(x =  Candidatos, y = Porcentagem,  fill = Candidatos)) + geom_bar(stat = "identity")+facet_wrap(~Aproximacao)+
+  scale_x_discrete(labels=c( "PorcGetulio50" = "Vargas", "PorcGomes50" = "Gomes", "PorcMachado50" = "Machado"))+
+  theme_bw()+
+  scale_fill_manual(values = c("#1d3057", "#dac364","#fe8100"))+theme(legend.position = "none")+labs(title = "Distribuição de votos na Capital de São Paulo")
+```
+
+[^1]: O sentido contrário não me parece ter sentido lógico, portanto, acredito que: proximidade com a capital $\rightarrow$ urbanização.
+
+[^2]: Devido aos poucos votos recebidos por Mangabeira, optei por retirá-lo dos dados.
